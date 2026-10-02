@@ -1,199 +1,1124 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TutorTrust — tutoring without the platform tax</title>
-<!-- ethers.js v6 from a public CDN: this one line is the entire "tech stack" -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.17.0/ethers.umd.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TutorTrust · Pay your tutor after the session</title>
+<meta name="description" content="Peer tutoring where your payment waits in escrow until the session actually happens. Runs on the Sepolia test network.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='9' fill='%230e7268'/%3E%3Cpath d='M10 16.5l4 4 8-9' fill='none' stroke='white' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --navy:#1f3a5f; --teal:#0e8c8c; --berry:#a8236b; --bg:#f6f8fa; }
+  :root {
+    --paper: #f6f4ee;
+    --card: #ffffff;
+    --ink: #17223b;
+    --ink-2: #4b5468;
+    --ink-3: #7d8597;
+    --line: #e3dfd4;
+    --line-2: #efece4;
+    --teal: #0e7268;
+    --teal-ink: #ffffff;
+    --teal-soft: #e2f0ed;
+    --amber: #9a5508;
+    --amber-soft: #fbefd9;
+    --berry: #a01d58;
+    --berry-soft: #f9e5ee;
+    --slate-soft: #eceef2;
+    --shadow: 0 1px 2px rgba(23, 34, 59, .05), 0 6px 20px rgba(23, 34, 59, .05);
+    --radius: 14px;
+    --serif: "Fraunces", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #11151d;
+      --card: #191f2a;
+      --ink: #ebe8e1;
+      --ink-2: #b0b6c3;
+      --ink-3: #868d9c;
+      --line: #2b3242;
+      --line-2: #222836;
+      --teal: #3db3a5;
+      --teal-ink: #07201d;
+      --teal-soft: #15302d;
+      --amber: #e3a650;
+      --amber-soft: #33270f;
+      --berry: #e7739f;
+      --berry-soft: #3a1a28;
+      --slate-soft: #252c39;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .2);
+      color-scheme: dark;
+    }
+  }
+
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-         margin: 0; background: var(--bg); color: #1c2733; }
-  header { background: var(--navy); color: #fff; padding: 20px 24px; }
-  header h1 { margin: 0 0 4px; font-size: 22px; }
-  header p { margin: 0; opacity: .85; font-size: 14px; }
-  main { max-width: 860px; margin: 24px auto; padding: 0 16px; }
-  .card { background: #fff; border: 1px solid #dde3ea; border-radius: 10px;
-          padding: 18px 20px; margin-bottom: 16px; }
-  .card h2 { margin: 0 0 10px; font-size: 16px; color: var(--navy); }
-  button { background: var(--teal); color: #fff; border: 0; border-radius: 8px;
-           padding: 10px 16px; font-size: 14px; cursor: pointer; }
-  button:hover { filter: brightness(1.08); }
-  button.secondary { background: var(--navy); }
-  button:disabled { background: #9fb0c0; cursor: not-allowed; }
-  input { padding: 9px 10px; border: 1px solid #c7d0da; border-radius: 8px;
-          font-size: 14px; margin-right: 8px; }
-  input.wide { width: 320px; max-width: 100%; }
-  #status { font-size: 14px; padding: 10px 12px; border-radius: 8px;
-            background: #eef4fb; border: 1px solid #c9dcf2; min-height: 20px; }
-  #status a { color: var(--navy); }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e6ebf1; }
-  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px;
-          font-size: 12px; color: #fff; }
-  .s0 { background: var(--teal); }   /* Open */
-  .s1 { background: var(--navy); }   /* Accepted */
-  .s2 { background: #4a7c2f; }       /* Paid */
-  .s3 { background: var(--berry); }  /* Cancelled */
-  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
-  .warn { background: #fff6e6; border: 1px solid #f0d9a6; border-radius: 8px;
-          padding: 10px 12px; font-size: 13px; margin-bottom: 16px; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 16px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--teal); }
+  button { font: inherit; color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-left: 20px; padding-right: 20px; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+    backdrop-filter: saturate(1.2) blur(8px);
+    -webkit-backdrop-filter: saturate(1.2) blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .wrap { display: flex; align-items: center; gap: 14px; height: 64px; }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font: 600 21px/1 var(--serif); letter-spacing: -0.01em;
+    color: var(--ink); text-decoration: none;
+  }
+  .brand svg { width: 30px; height: 30px; flex: none; }
+  .spacer { flex: 1; }
+  .net-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--ink-2);
+    padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+    background: var(--card); white-space: nowrap;
+  }
+  .net-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+  .net-pill.ok .dot { background: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+  .net-pill.bad { color: var(--berry); background: var(--berry-soft); border-color: transparent; }
+  .net-pill.bad .dot { background: var(--berry); }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 500 15px/1 var(--sans);
+    padding: 11px 16px; border-radius: 10px; border: 1px solid transparent;
+    cursor: pointer; text-decoration: none; white-space: nowrap;
+    transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s;
+  }
+  .btn:focus-visible, .chip:focus-visible, .tab:focus-visible, .icon-btn:focus-visible, .wallet-btn:focus-visible {
+    outline: 2px solid var(--teal); outline-offset: 2px;
+  }
+  .btn-primary { background: var(--ink); color: var(--paper); }
+  .btn-primary:hover { background: color-mix(in srgb, var(--ink) 85%, var(--teal)); }
+  .btn-teal { background: var(--teal); color: var(--teal-ink); }
+  .btn-teal:hover { background: color-mix(in srgb, var(--teal) 86%, var(--ink)); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { background: var(--line-2); }
+  .btn-danger { background: var(--berry); color: #fff; }
+  .btn-danger:hover { background: color-mix(in srgb, var(--berry) 85%, #000); }
+  .btn-sm { padding: 8px 13px; font-size: 14px; border-radius: 9px; }
+  .btn-block { width: 100%; }
+  .btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+  .wallet { position: relative; }
+  .wallet-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 8px 6px 10px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--line); cursor: pointer;
+  }
+  .wallet-btn:hover { border-color: var(--ink-3); }
+  .wallet-btn .addr { font: 500 14px var(--mono); }
+  .wallet-btn .bal {
+    font: 500 13px var(--mono); color: var(--ink-2);
+    background: var(--line-2); padding: 4px 8px; border-radius: 7px;
+  }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 8px);
+    min-width: 250px; padding: 6px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .14);
+    display: none;
+  }
+  .menu.open { display: block; }
+  .menu-head { padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line-2); }
+  .menu-head .k { font-size: 12px; color: var(--ink-3); }
+  .menu-head .full { font: 400 12px/1.5 var(--mono); word-break: break-all; color: var(--ink-2); }
+  .menu button, .menu a {
+    display: block; width: 100%; text-align: left;
+    padding: 9px 10px; border-radius: 8px; border: 0; background: none;
+    font-size: 14px; color: var(--ink); text-decoration: none; cursor: pointer;
+  }
+  .menu button:hover, .menu a:hover { background: var(--line-2); }
+
+  /* ---------- banners ---------- */
+  .banner { margin-top: 16px; }
+  .banner-inner {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 12px 14px 12px 16px; border-radius: 12px;
+    background: var(--berry-soft); color: var(--ink);
+    border: 1px solid color-mix(in srgb, var(--berry) 25%, transparent);
+  }
+  .banner-inner p { margin: 0; flex: 1; min-width: 220px; font-size: 15px; }
+
+  /* ---------- intro ---------- */
+  .intro {
+    display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: end;
+    padding-top: 52px; padding-bottom: 36px;
+  }
+  .intro h1 {
+    font: 600 clamp(34px, 4.8vw, 52px)/1.05 var(--serif);
+    letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance;
+    font-variation-settings: "opsz" 120;
+  }
+  .intro h1 em { font-style: normal; color: var(--teal); }
+  .lede { font-size: 18px; color: var(--ink-2); margin: 0; max-width: 33em; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; counter-reset: step; }
+  .steps li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; }
+  .steps li::before {
+    counter-increment: step; content: counter(step);
+    width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center;
+    border: 1px solid var(--line); background: var(--card);
+    font: 500 13px var(--mono); color: var(--teal);
+  }
+  .steps b { display: block; font-weight: 600; font-size: 15.5px; }
+  .steps span { display: block; color: var(--ink-2); font-size: 14.5px; }
+
+  /* ---------- layout ---------- */
+  .layout {
+    display: grid; gap: 24px; align-items: start;
+    grid-template-columns: 370px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "post board" "rules board";
+    padding-bottom: 64px;
+  }
+  .area-post { grid-area: post; }
+  .area-rules { grid-area: rules; }
+  .area-board { grid-area: board; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .panel { padding: 22px; }
+  .panel h2, .board-head h2 { font: 600 22px/1.2 var(--serif); margin: 0; letter-spacing: -0.01em; }
+  .panel .sub { color: var(--ink-2); font-size: 14.5px; margin: 6px 0 20px; }
+
+  /* ---------- form ---------- */
+  .field { margin-bottom: 18px; }
+  .field-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+  .field-label label { font-weight: 500; font-size: 14.5px; }
+  .count { font: 400 12px var(--mono); color: var(--ink-3); }
+  .input, .amount {
+    width: 100%; border: 1px solid var(--line); background: var(--paper);
+    border-radius: 10px; color: var(--ink);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .input { padding: 11px 12px; font: 400 15px var(--sans); }
+  .input::placeholder, .amount input::placeholder { color: var(--ink-3); }
+  .input:focus, .amount:focus-within { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+  .amount { display: flex; align-items: center; }
+  .amount input {
+    flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
+    padding: 11px 12px; font: 500 16px var(--mono); color: var(--ink);
+  }
+  .amount .unit { padding: 0 14px; font: 500 13px var(--mono); color: var(--ink-3); }
+  .chips { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+  .chip {
+    font: 500 13px var(--mono); padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-2); cursor: pointer;
+  }
+  .chip:hover { border-color: var(--ink-3); }
+  .chip.on { border-color: var(--teal); color: var(--teal); background: var(--teal-soft); }
+  .hint { font-size: 13px; color: var(--ink-3); margin: 8px 0 0; }
+  .form-error { font-size: 14px; color: var(--berry); margin: -6px 0 14px; display: none; }
+  .form-error.show { display: block; }
+  .form-note { font-size: 13px; color: var(--ink-3); margin: 12px 0 0; }
+  .low-balance {
+    font-size: 13.5px; margin: 14px 0 0; padding: 10px 12px; border-radius: 10px;
+    background: var(--amber-soft); color: var(--ink); display: none;
+  }
+  .low-balance.show { display: block; }
+
+  /* ---------- rules ---------- */
+  .rules h2 { font-size: 19px; }
+  .rules p { font-size: 14.5px; color: var(--ink-2); margin: 10px 0; }
+  .exits { list-style: none; margin: 14px 0; padding: 0; display: grid; gap: 10px; }
+  .exits li {
+    display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start;
+    font-size: 14.5px; padding: 10px 12px; border-radius: 10px; background: var(--paper);
+  }
+  .exits svg { width: 22px; height: 22px; color: var(--teal); margin-top: 1px; }
+  .rules .catch { font-size: 13.5px; color: var(--ink-3); border-top: 1px solid var(--line-2); padding-top: 12px; margin-bottom: 12px; }
+  .rules a { font-size: 14px; font-weight: 500; text-decoration: none; }
+  .rules a:hover { text-decoration: underline; }
+
+  /* ---------- board ---------- */
+  .board-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 22px 0; }
+  .board-sub { color: var(--ink-2); font-size: 14.5px; margin: 6px 22px 0; }
+  .updated { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-3); white-space: nowrap; }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line);
+    background: transparent; color: var(--ink-2); display: grid; place-items: center; cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--line-2); color: var(--ink); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .icon-btn.spinning svg { animation: spin .8s linear infinite; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    margin: 18px 22px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  }
+  .stat { padding: 12px 16px; }
+  .stat + .stat { border-left: 1px solid var(--line); }
+  .stat .k { font-size: 12.5px; color: var(--ink-3); }
+  .stat .v { font: 500 21px/1.3 var(--mono); margin-top: 2px; letter-spacing: -0.02em; }
+  .stat .v small { font-size: 13px; color: var(--ink-3); font-weight: 400; letter-spacing: 0; }
+
+  .tabs { display: flex; gap: 6px; padding: 0 22px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    padding: 10px 8px 12px; font-size: 14.5px; font-weight: 500; color: var(--ink-2);
+    cursor: pointer; white-space: nowrap;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+  .tab .n { font: 500 11.5px var(--mono); color: var(--ink-3); background: var(--line-2); padding: 2px 7px; border-radius: 999px; margin-left: 5px; }
+  .tab[hidden] { display: none; }
+
+  .list { padding: 4px 22px 14px; }
+  .req { padding: 18px 0; border-bottom: 1px solid var(--line-2); }
+  .req:last-child { border-bottom: 0; }
+  .req-top { display: flex; align-items: center; gap: 10px; }
+  .req-id { font: 500 13px var(--mono); color: var(--ink-3); }
+  .req-amount { margin-left: auto; font: 500 17px var(--mono); white-space: nowrap; letter-spacing: -0.01em; }
+  .req-amount small { font-size: 12.5px; color: var(--ink-3); font-weight: 400; }
+  .req.done .req-amount { color: var(--ink-2); }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; padding: 3px 10px 3px 8px; border-radius: 999px; }
+  .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status.open { background: var(--teal-soft); color: var(--teal); }
+  .status.accepted { background: var(--amber-soft); color: var(--amber); }
+  .status.paid { background: var(--slate-soft); color: var(--ink-2); }
+  .status.cancelled { background: var(--slate-soft); color: var(--ink-3); }
+  .req-subject { font-size: 17px; font-weight: 500; line-height: 1.4; margin: 8px 0 6px; overflow-wrap: anywhere; }
+  .req.done .req-subject { color: var(--ink-2); }
+  .req-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13.5px; color: var(--ink-3); }
+  .who { display: inline-flex; align-items: center; gap: 6px; }
+  .who a { font: 400 13px var(--mono); color: var(--ink-2); text-decoration: none; }
+  .who a:hover { color: var(--ink); text-decoration: underline; }
+  .avatar { width: 16px; height: 16px; border-radius: 50%; flex: none; }
+  .you { font-size: 11.5px; font-weight: 600; color: var(--teal); background: var(--teal-soft); padding: 1px 7px; border-radius: 999px; }
+  .req-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+  .req-info { flex: 1; min-width: 240px; }
+  .req-note { font-size: 14px; color: var(--ink-2); margin-top: 8px; }
+  .req-note.warn { color: var(--berry); font-weight: 500; }
+  .req-actions { display: flex; gap: 8px; margin-left: auto; }
+
+  .empty { text-align: center; padding: 44px 16px 40px; color: var(--ink-2); }
+  .empty b { display: block; font: 600 18px var(--serif); color: var(--ink); margin-bottom: 4px; }
+  .empty p { margin: 0 auto; max-width: 30em; font-size: 14.5px; }
+
+  .skel { padding: 18px 0; border-bottom: 1px solid var(--line-2); }
+  .skel i {
+    display: block; height: 12px; border-radius: 6px; margin: 8px 0;
+    background: linear-gradient(90deg, var(--line-2) 0%, var(--line) 50%, var(--line-2) 100%);
+    background-size: 200% 100%; animation: shimmer 1.3s ease-in-out infinite;
+  }
+
+  /* ---------- footer ---------- */
+  footer { border-top: 1px solid var(--line); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; padding-top: 22px; padding-bottom: 40px; font-size: 13.5px; color: var(--ink-3); }
+  footer a { color: var(--ink-2); }
+  footer .mono { font-family: var(--mono); font-size: 13px; }
+
+  /* ---------- toasts ---------- */
+  .toasts { position: fixed; right: 20px; bottom: 20px; z-index: 50; display: grid; gap: 10px; width: min(380px, calc(100vw - 32px)); }
+  .toast {
+    display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start;
+    padding: 14px; border-radius: 12px; background: var(--card);
+    border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0, 0, 0, .13);
+    animation: rise .18s ease-out;
+  }
+  .toast.leaving { opacity: 0; transform: translateY(6px); transition: opacity .18s, transform .18s; }
+  .toast.error { border-color: color-mix(in srgb, var(--berry) 40%, var(--line)); }
+  .t-icon { width: 22px; height: 22px; display: grid; place-items: center; }
+  .t-icon svg { width: 22px; height: 22px; }
+  .t-title { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+  .t-body { font-size: 13.5px; color: var(--ink-2); margin-top: 2px; }
+  .t-body a { font-weight: 500; }
+  .t-close { border: 0; background: none; color: var(--ink-3); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 2px; }
+  .t-close:hover { color: var(--ink); }
+
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; animation: spin .7s linear infinite; }
+  .t-icon .spin { width: 18px; height: 18px; color: var(--teal); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+  }
+
+  /* ---------- smaller screens ---------- */
+  @media (max-width: 920px) {
+    .intro { grid-template-columns: 1fr; gap: 28px; padding-top: 36px; padding-bottom: 28px; }
+    .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "post" "board" "rules"; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding-left: 16px; padding-right: 16px; }
+    .topbar .wrap { height: 58px; }
+    .net-pill { display: none; }
+    .wallet-btn .bal { display: none; }
+    .lede { font-size: 16.5px; }
+    .panel { padding: 18px; }
+    .board-head { padding: 18px 18px 0; }
+    .board-sub { margin: 6px 18px 0; }
+    .stats { margin: 16px 18px; }
+    .stat { padding: 10px 11px; }
+    .stat .k { font-size: 12px; white-space: nowrap; }
+    .stat .v { font-size: 16px; white-space: nowrap; }
+    .stat .v small { font-size: 11px; }
+    .tabs { gap: 2px; }
+    .tab { padding-left: 6px; padding-right: 6px; font-size: 14px; }
+    .tab .n { margin-left: 3px; padding: 2px 6px; }
+    .tabs { padding: 0 18px; }
+    .list { padding: 0 18px 10px; }
+    .req-actions { width: 100%; }
+    .req-actions .btn { flex: 1; }
+    .toasts { left: 16px; right: 16px; bottom: 16px; width: auto; }
+    .menu { position: fixed; left: 16px; right: 16px; top: 64px; min-width: 0; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>TutorTrust</h1>
-  <p>Book a tutor. The payment locks itself in the contract until you confirm. No platform, no fee.</p>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="./">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="9" style="fill:var(--teal)"/><path d="M10 16.5l4 4 8-9" fill="none" style="stroke:var(--card)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      TutorTrust
+    </a>
+    <div class="spacer"></div>
+    <span class="net-pill" id="net-pill"><span class="dot"></span><span id="net-label">Sepolia test network</span></span>
+    <div class="wallet" id="wallet"></div>
+  </div>
 </header>
+
+<div class="wrap banner" id="banner" hidden>
+  <div class="banner-inner">
+    <p id="banner-text"></p>
+    <button class="btn btn-sm btn-primary" id="banner-action" hidden></button>
+  </div>
+</div>
+
 <main>
-  <div class="warn">Testnet only — the ETH here is play money from a faucet. Never connect a wallet that holds real funds.</div>
- 
-  <div class="card">
-    <h2>1 · Connect</h2>
-    <button id="connectBtn">Connect MetaMask</button>
-    <span id="account" class="mono"></span>
-    <p id="status">Not connected.</p>
-  </div>
- 
-  <div class="card">
-    <h2>2 · Post a tutoring request (locks your test ETH in escrow)</h2>
-    <input id="subject" class="wide" placeholder="What do you need? e.g., COMM 412 exam prep">
-    <input id="price" placeholder="Payment in ETH, e.g., 0.001" size="16">
-    <button id="postBtn" disabled>Post request</button>
-  </div>
- 
-  <div class="card">
-    <h2>3 · Requests on the blockchain</h2>
-    <button id="refreshBtn" class="secondary" disabled>Refresh list</button>
-    <table id="reqTable">
-      <thead><tr><th>#</th><th>Subject</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody></tbody>
-    </table>
+  <section class="wrap intro">
+    <div>
+      <h1>Pay your tutor <em>after</em> the session, not before.</h1>
+      <p class="lede">Post what you need help with and put the payment in escrow. A classmate picks it up, you meet, and once you confirm it happened the money goes straight to them. Nobody in the middle takes a cut.</p>
+    </div>
+    <ol class="steps">
+      <li><div><b>Post a request</b><span>Say what you need and lock in what you'll pay.</span></div></li>
+      <li><div><b>A tutor accepts</b><span>Anyone with a wallet can take an open request. First one wins.</span></div></li>
+      <li><div><b>Confirm and pay</b><span>After the session, release the payment to your tutor.</span></div></li>
+    </ol>
+  </section>
+
+  <div class="wrap layout">
+
+    <section class="card panel area-post" aria-labelledby="post-title">
+      <h2 id="post-title">Ask for help</h2>
+      <p class="sub">Your payment is held by the contract until you release it.</p>
+      <form id="post-form" novalidate>
+        <div class="field">
+          <div class="field-label">
+            <label for="subject">What do you need help with?</label>
+            <span class="count" id="count">0/120</span>
+          </div>
+          <input class="input" id="subject" type="text" maxlength="120" autocomplete="off"
+                 placeholder="e.g. ECON 201 midterm review">
+        </div>
+        <div class="field">
+          <div class="field-label"><label for="amount">Payment</label></div>
+          <div class="amount">
+            <input id="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00">
+            <span class="unit">ETH</span>
+          </div>
+          <div class="chips" id="chips">
+            <button type="button" class="chip" data-v="0.001">0.001</button>
+            <button type="button" class="chip" data-v="0.005">0.005</button>
+            <button type="button" class="chip" data-v="0.01">0.01</button>
+          </div>
+          <p class="hint">Sepolia test ETH only. It has no real value.</p>
+        </div>
+        <p class="form-error" id="form-error" role="alert"></p>
+        <button class="btn btn-primary btn-block" id="post-btn" type="submit">Post and lock payment</button>
+        <p class="form-note" id="form-note"></p>
+        <p class="low-balance" id="low-balance">Your wallet is almost empty. <a href="#" id="faucet-link" target="_blank" rel="noopener">Get free test ETH from a faucet</a>, then come back.</p>
+      </form>
+    </section>
+
+    <section class="card area-board" aria-labelledby="board-title">
+      <div class="board-head">
+        <h2 id="board-title">Requests</h2>
+        <div class="updated">
+          <span id="updated"></span>
+          <button class="icon-btn" id="refresh" type="button" aria-label="Refresh requests">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="board-sub" id="board-sub">Everything here is read straight from the contract.</p>
+      <div class="stats">
+        <div class="stat"><div class="k">Open now</div><div class="v" id="st-open">…</div></div>
+        <div class="stat"><div class="k">In escrow</div><div class="v" id="st-escrow">…</div></div>
+        <div class="stat"><div class="k">Paid to tutors</div><div class="v" id="st-paid">…</div></div>
+      </div>
+      <div class="tabs" id="tabs">
+        <button type="button" class="tab" data-f="all" aria-pressed="true">All<span class="n" id="n-all">0</span></button>
+        <button type="button" class="tab" data-f="open" aria-pressed="false">Open<span class="n" id="n-open">0</span></button>
+        <button type="button" class="tab" data-f="mine" aria-pressed="false" hidden>My requests<span class="n" id="n-mine">0</span></button>
+        <button type="button" class="tab" data-f="tutoring" aria-pressed="false" hidden>Tutoring<span class="n" id="n-tutoring">0</span></button>
+      </div>
+      <div class="list" id="list" aria-live="polite"></div>
+    </section>
+
+    <aside class="card panel rules area-rules" aria-labelledby="rules-title">
+      <h2 id="rules-title">Where the money can go</h2>
+      <p>Once you post, the payment sits in the contract. From there it has exactly two ways out:</p>
+      <ul class="exits">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+          <span>To the tutor, when the student confirms the session happened.</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+          <span>Back to the student, if they cancel before anyone accepts.</span>
+        </li>
+      </ul>
+      <p>Nobody else can move it. Not the tutor, not another student, and not whoever built this page.</p>
+      <p class="catch">One catch: after a tutor accepts, the request can't be cancelled. If the session never happens, the payment stays locked.</p>
+      <a id="contract-link" href="#" target="_blank" rel="noopener">Read the contract on Etherscan →</a>
+    </aside>
+
   </div>
 </main>
- 
+
+<footer>
+  <div class="wrap">
+    <span>TutorTrust is a COMM 412 class demo on the Sepolia test network. Nothing here has real value.</span>
+    <span>Contract <a class="mono" id="footer-contract" href="#" target="_blank" rel="noopener"></a></span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts"></div>
+
+<noscript><p style="text-align:center;padding:16px">TutorTrust needs JavaScript turned on.</p></noscript>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.17.0/ethers.umd.min.js"></script>
 <script>
-// STEP 1: Paste YOUR deployed contract address between the quotes.
-const CONTRACT_ADDRESS = "0x4ee1Ea5C546e1aE73ceba0889d9d0B6A9CA1eA62";
- 
-// The network we expect: Sepolia, chain id 11155111 (0xaa36a7 in hex).
-const CHAIN_ID_HEX = "0xaa36a7";
-const EXPLORER = "https://sepolia.etherscan.io";
- 
-// The contract's public menu — must match what you deployed.
+// ---------------------------------------------------------------------------
+// Settings. If the class moves to a different test network, these are the
+// only lines that need to change.
+// ---------------------------------------------------------------------------
+const CONTRACT_ADDRESS = "0x7945b5DCcBf17EEC027B8648731373316b7b674E";
+const CHAIN_ID   = 11155111;                         // Sepolia
+const CHAIN_NAME = "Sepolia";
+const EXPLORER   = "https://sepolia.etherscan.io";
+const READ_RPC   = "https://ethereum-sepolia-rpc.publicnode.com"; // lets visitors see the board without a wallet
+const FAUCET     = "https://cloud.google.com/application/web3/faucet/ethereum/sepolia";
+
+// The parts of the contract this page talks to.
 const ABI = [
   "function requestCount() view returns (uint256)",
   "function requests(uint256) view returns (address student, address tutor, uint256 amount, string subject, uint8 status)",
-  "function postRequest(string subject) payable returns (uint256)",
+  "function postRequest(string subject) payable returns (uint256 id)",
   "function acceptRequest(uint256 id)",
   "function releasePayment(uint256 id)",
-  "function cancelRequest(uint256 id)"
+  "function cancelRequest(uint256 id)",
+  "event RequestPosted(uint256 indexed id, address indexed student, uint256 amount, string subject)",
+  "event RequestAccepted(uint256 indexed id, address indexed tutor)",
+  "event PaymentReleased(uint256 indexed id, address indexed tutor, uint256 amount)",
+  "event RequestCancelled(uint256 indexed id)"
 ];
- 
-const STATUS_NAMES = ["Open", "Accepted", "Paid", "Cancelled"];
-let provider, signer, contract, myAddress;
- 
-const $ = (id) => document.getElementById(id);
-const say = (html) => { $("status").innerHTML = html; };
- 
-function short(addr) { return addr.slice(0, 6) + "…" + addr.slice(-4); }
- 
-function explain(err) {
-  const m = (err && (err.reason || err.shortMessage || err.message)) || "Unknown error";
-  return m.length > 140 ? m.slice(0, 140) + "…" : m;
+
+// Same order as the Status enum in the contract.
+const STATUS = ["open", "accepted", "paid", "cancelled"];
+const STATUS_LABEL = { open: "Open", accepted: "Accepted", paid: "Paid", cancelled: "Cancelled" };
+
+const state = {
+  browser: null,      // ethers.BrowserProvider, when MetaMask is installed
+  signer: null,       // set once connected on the right network
+  account: null,      // lowercase address of the connected account
+  balance: null,
+  chainOk: false,
+  requests: [],
+  loaded: false,
+  loadError: false,
+  filter: "all",
+  busy: new Set(),    // request ids with a transaction in flight
+  armed: null,        // { id, action } waiting for a second click
+  updatedAt: null,
+  posting: false
+};
+
+const $ = (sel) => document.querySelector(sel);
+
+// ---------- small helpers ----------
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
+const same = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
+function fmtEth(wei) {
+  const n = Number(ethers.formatEther(wei));
+  if (n === 0) return "0";
+  if (n < 0.0001) return "<0.0001";
+  return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
- 
+
+// A colour pair derived from the address, so the same person always looks the same.
+function avatar(addr) {
+  const h1 = parseInt(addr.slice(2, 6), 16) % 360;
+  const h2 = parseInt(addr.slice(-4), 16) % 360;
+  return `<span class="avatar" aria-hidden="true" style="background:linear-gradient(135deg,hsl(${h1} 60% 58%),hsl(${h2} 55% 42%))"></span>`;
+}
+
+function person(addr) {
+  const me = same(addr, state.account);
+  return `<span class="who">${avatar(addr)}<a href="${EXPLORER}/address/${addr}" target="_blank" rel="noopener" title="${addr}">${short(addr)}</a>${me ? '<span class="you">you</span>' : ""}</span>`;
+}
+
+let readProvider = null;
+function reader() {
+  if (state.browser && state.chainOk) return state.browser;
+  if (!readProvider) readProvider = new ethers.JsonRpcProvider(READ_RPC, CHAIN_ID, { staticNetwork: true });
+  return readProvider;
+}
+const readContract = () => new ethers.Contract(CONTRACT_ADDRESS, ABI, reader());
+const writeContract = () => new ethers.Contract(CONTRACT_ADDRESS, ABI, state.signer);
+
+// Turns wallet and contract errors into something a person can act on.
+function friendlyError(e) {
+  const text = [e?.reason, e?.shortMessage, e?.info?.error?.message, e?.error?.message, e?.message].filter(Boolean).join(" | ");
+  if (e?.code === "ACTION_REJECTED" || e?.code === 4001 || /user (rejected|denied)/i.test(text))
+    return "You rejected it in MetaMask, so nothing was sent.";
+  if (/insufficient funds/i.test(text))
+    return "Your wallet doesn't have enough Sepolia ETH to cover this plus the network fee.";
+  const reasons = {
+    "Attach a payment to escrow": "The payment has to be more than zero.",
+    "Request is not open": "Someone already took this request, or it was cancelled. The board has been refreshed.",
+    "Student cannot tutor themselves": "That's your own request. Switch to a different MetaMask account to try the tutor side.",
+    "Only the student can release": "Only the student who posted this request can release the payment.",
+    "A tutor must accept first": "No one has accepted this request yet.",
+    "Only the student can cancel": "Only the student who posted this request can cancel it.",
+    "Can only cancel before acceptance": "A tutor already accepted, so this can't be cancelled anymore.",
+    "Transfer failed": "The payment to the tutor didn't go through. Nothing changed, try again.",
+    "Refund failed": "The refund didn't go through. Nothing changed, try again."
+  };
+  for (const [k, v] of Object.entries(reasons)) if (text.includes(k)) return v;
+  if (e?.code === "CALL_EXCEPTION")
+    return "The contract turned this down. Someone may have acted on this request first, so the board has been refreshed.";
+  return e?.shortMessage || "Something went wrong. Check MetaMask and try again.";
+}
+
+// ---------- toasts ----------
+const ICONS = {
+  pending: '<span class="spin"></span>',
+  success: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" style="fill:var(--teal)"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" style="stroke:var(--card)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  error: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" style="fill:var(--berry)"/><path d="M12 7v6" style="stroke:var(--card)" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="1.3" style="fill:var(--card)"/></svg>',
+  info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" style="fill:var(--ink-3)"/><path d="M12 11v6" style="stroke:var(--card)" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="7.6" r="1.3" style="fill:var(--card)"/></svg>'
+};
+
+function toast(opts) {
+  const el = document.createElement("div");
+  const cur = { type: "info", title: "", body: "", timeout: 0 };
+  let timer;
+  const api = {
+    update(o) {
+      Object.assign(cur, o);
+      el.className = "toast " + cur.type;
+      el.setAttribute("role", cur.type === "error" ? "alert" : "status");
+      el.innerHTML = `<div class="t-icon">${ICONS[cur.type] || ""}</div>
+        <div><div class="t-title">${esc(cur.title)}</div>${cur.body ? `<div class="t-body">${cur.body}</div>` : ""}</div>
+        <button class="t-close" type="button" aria-label="Dismiss">×</button>`;
+      el.querySelector(".t-close").onclick = api.close;
+      clearTimeout(timer);
+      if (cur.timeout) timer = setTimeout(api.close, cur.timeout);
+      if (el.isConnected) trimToasts();
+    },
+    close() {
+      clearTimeout(timer);
+      el.classList.add("leaving");
+      setTimeout(() => el.remove(), 200);
+    }
+  };
+  el._close = api.close;
+  api.update(opts);
+  $("#toasts").appendChild(el);
+  trimToasts();
+  return api;
+}
+
+function trimToasts() {
+  const settled = [...document.querySelectorAll(".toast:not(.leaving):not(.pending)")];
+  settled.slice(0, Math.max(0, settled.length - 3)).forEach((n) => n._close());
+}
+
+const txLink = (hash, label = "View on Etherscan") => `<a href="${EXPLORER}/tx/${hash}" target="_blank" rel="noopener">${label}</a>`;
+
+// ---------- wallet ----------
+async function syncWallet() {
+  if (!window.ethereum) return;
+  try {
+    const [accounts, chainHex] = await Promise.all([
+      window.ethereum.request({ method: "eth_accounts" }),
+      window.ethereum.request({ method: "eth_chainId" })
+    ]);
+    state.chainOk = parseInt(chainHex, 16) === CHAIN_ID;
+    state.account = accounts[0] ? accounts[0].toLowerCase() : null;
+    state.browser = new ethers.BrowserProvider(window.ethereum);
+    state.signer = state.account && state.chainOk ? await state.browser.getSigner(accounts[0]) : null;
+    state.balance = state.signer ? await state.browser.getBalance(state.account) : null;
+  } catch (e) {
+    console.error(e);
+  }
+  state.armed = null;
+  if (!state.account && (state.filter === "mine" || state.filter === "tutoring")) state.filter = "all";
+  renderWallet();
+  renderForm();
+  renderBoard();
+}
+
+async function refreshBalance() {
+  if (!state.signer) return;
+  try { state.balance = await state.browser.getBalance(state.account); } catch (e) { /* not critical */ }
+  renderWallet();
+  renderForm();
+}
+
 async function connect() {
   if (!window.ethereum) {
-    say("MetaMask not detected. If you opened this file straight from your computer, enable " +
-        "chrome://extensions → MetaMask → Allow access to file URLs, then reload — or host the file " +
-        "on GitHub Pages.");
+    window.open("https://metamask.io/download/", "_blank", "noopener");
+    return false;
+  }
+  try {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    await syncWallet();
+    if (!state.chainOk) await switchNetwork();
+    return !!state.signer;
+  } catch (e) {
+    if (e?.code === -32002) toast({ type: "info", title: "MetaMask is already asking", body: "Open the MetaMask extension to finish connecting.", timeout: 8000 });
+    else if (e?.code === 4001) toast({ type: "info", title: "Not connected", body: "You closed the MetaMask window. Connect whenever you're ready.", timeout: 6000 });
+    else toast({ type: "error", title: "Couldn't connect", body: esc(friendlyError(e)), timeout: 9000 });
+    return false;
+  }
+}
+
+async function switchNetwork() {
+  const chainId = "0x" + CHAIN_ID.toString(16);
+  try {
+    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId }] });
+  } catch (e) {
+    if (e?.code === 4902) {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{ chainId, chainName: CHAIN_NAME, nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 }, rpcUrls: [READ_RPC], blockExplorerUrls: [EXPLORER] }]
+      });
+    } else if (e?.code !== 4001) {
+      toast({ type: "error", title: `Couldn't switch to ${CHAIN_NAME}`, body: `Open MetaMask and pick ${CHAIN_NAME} from the network list.`, timeout: 9000 });
+    }
+  }
+  await syncWallet();
+}
+
+// Sends a transaction and walks the person through what's happening.
+async function runTx({ id = null, pending, done, send }) {
+  if (!state.signer && !(await connect())) return null;
+  if (id) state.busy.add(id);
+  state.armed = null;
+  renderBoard();
+  const t = toast({ type: "pending", title: pending, body: "Confirm it in MetaMask." });
+  try {
+    const tx = await send(writeContract());
+    t.update({ body: `Sent. Waiting for the network to include it. ${txLink(tx.hash)}` });
+    const receipt = await tx.wait();
+    const title = typeof done === "function" ? done(receipt) : done;
+    t.update({ type: "success", title, body: txLink(tx.hash, "View transaction"), timeout: 7000 });
+    return receipt;
+  } catch (e) {
+    if (e?.code !== "ACTION_REJECTED") console.error(e);
+    t.update({ type: "error", title: "That didn't go through", body: esc(friendlyError(e)), timeout: 10000 });
+    return null;
+  } finally {
+    if (id) state.busy.delete(id);
+    await Promise.all([loadBoard({ quiet: true }), refreshBalance()]);
+  }
+}
+
+// ---------- board ----------
+let loading = false;
+async function loadBoard({ quiet = false } = {}) {
+  if (loading) return;
+  loading = true;
+  $("#refresh").classList.add("spinning");
+  try {
+    const c = readContract();
+    const count = Number(await c.requestCount());
+    const ids = [];
+    for (let i = count; i >= 1; i--) ids.push(i);          // newest first
+    const rows = [];
+    for (let i = 0; i < ids.length; i += 25) {
+      const chunk = ids.slice(i, i + 25);
+      const res = await Promise.all(chunk.map((id) => c.requests(id)));
+      res.forEach((r, k) => rows.push({
+        id: chunk[k], student: r.student, tutor: r.tutor, amount: r.amount,
+        subject: r.subject, status: STATUS[Number(r.status)]
+      }));
+    }
+    state.requests = rows;
+    state.loaded = true;
+    state.loadError = false;
+    state.updatedAt = Date.now();
+  } catch (e) {
+    console.error(e);
+    if (!state.loaded) state.loadError = true;
+    if (!quiet) toast({ type: "error", title: "Couldn't refresh", body: "The network didn't answer. Give it a moment and try again.", timeout: 7000 });
+  } finally {
+    loading = false;
+    $("#refresh").classList.remove("spinning");
+    renderBoard();
+    renderUpdated();
+  }
+}
+
+function inFilter(r, f) {
+  if (f === "open") return r.status === "open";
+  if (f === "mine") return same(r.student, state.account);
+  if (f === "tutoring") return same(r.tutor, state.account);
+  return true;
+}
+
+function actionButton(action, id, label, style, disabled = false) {
+  return `<button type="button" class="btn btn-sm ${style}" data-action="${action}" data-id="${id}"${disabled ? " disabled" : ""}>${label}</button>`;
+}
+
+function requestRow(r) {
+  const isStudent = same(r.student, state.account);
+  const isTutor = same(r.tutor, state.account);
+  const hasTutor = r.tutor !== ethers.ZeroAddress;
+  const busy = state.busy.has(r.id);
+  const armed = state.armed && state.armed.id === r.id ? state.armed.action : null;
+  const amt = fmtEth(r.amount);
+  let note = "", warn = false, actions = "";
+
+  if (busy) {
+    note = "Transaction in progress…";
+    actions = `<button type="button" class="btn btn-sm btn-ghost" disabled><span class="spin"></span> Waiting</button>`;
+  } else if (r.status === "open") {
+    if (isStudent) {
+      if (armed === "cancel") {
+        note = `You'll get your ${amt} ETH back.`; warn = true;
+        actions = actionButton("disarm", r.id, "Keep it", "btn-ghost") + actionButton("cancel", r.id, "Yes, cancel", "btn-danger");
+      } else {
+        note = "Waiting for a tutor. You can still cancel for a full refund.";
+        actions = actionButton("cancel", r.id, "Cancel and refund", "btn-ghost");
+      }
+    } else {
+      actions = actionButton("accept", r.id, "Accept request", "btn-teal");
+    }
+  } else if (r.status === "accepted") {
+    if (isStudent) {
+      if (armed === "release") {
+        note = `This sends ${amt} ETH to ${short(r.tutor)} and can't be undone.`; warn = true;
+        actions = actionButton("disarm", r.id, "Not yet", "btn-ghost") + actionButton("release", r.id, `Yes, pay ${amt} ETH`, "btn-teal");
+      } else {
+        note = "Had your session? Release the payment once it's done.";
+        actions = actionButton("release", r.id, "Release payment", "btn-teal");
+      }
+    } else if (isTutor) {
+      note = "You're tutoring this one. You'll be paid when the student confirms.";
+    }
+  } else if (r.status === "paid") {
+    if (isTutor) note = `You were paid ${amt} ETH for this one.`;
+    else if (isStudent) note = "You paid your tutor. All done.";
+  } else if (r.status === "cancelled") {
+    if (isStudent) note = "You cancelled this and got your refund.";
+  }
+
+  const tutorBit = hasTutor
+    ? `<span class="who">Tutor ${person(r.tutor)}</span>`
+    : (r.status === "open" ? "<span>No tutor yet</span>" : "");
+  const done = r.status === "paid" || r.status === "cancelled";
+
+  return `<article class="req${done ? " done" : ""}">
+    <div class="req-top">
+      <span class="req-id">#${r.id}</span>
+      <span class="status ${r.status}">${STATUS_LABEL[r.status]}</span>
+      <span class="req-amount">${amt} <small>ETH</small></span>
+    </div>
+    <div class="req-subject">${esc(r.subject || "(no description)")}</div>
+    <div class="req-bottom">
+      <div class="req-info">
+        <div class="req-meta"><span class="who">Posted by ${person(r.student)}</span>${tutorBit}</div>
+        ${note ? `<div class="req-note${warn ? " warn" : ""}">${esc(note)}</div>` : ""}
+      </div>
+      ${actions ? `<div class="req-actions">${actions}</div>` : ""}
+    </div>
+  </article>`;
+}
+
+function emptyState() {
+  const msgs = {
+    all: ["No requests yet", "Be the first. Post what you need help with and it'll show up here."],
+    open: ["Nothing open right now", "Every request has a tutor or is finished. Check back soon, or post your own."],
+    mine: ["You haven't posted anything", "Use the form to ask for help. Your requests will show up here."],
+    tutoring: ["You're not tutoring anything yet", "Accept an open request and it'll show up here."]
+  };
+  const [t, p] = msgs[state.filter];
+  return `<div class="empty"><b>${t}</b><p>${p}</p></div>`;
+}
+
+function renderBoard() {
+  const list = $("#list");
+  const reqs = state.requests;
+
+  // stats
+  const sum = (arr) => arr.reduce((a, r) => a + r.amount, 0n);
+  if (state.loaded) {
+    $("#st-open").textContent = reqs.filter((r) => r.status === "open").length;
+    $("#st-escrow").innerHTML = `${fmtEth(sum(reqs.filter((r) => r.status === "open" || r.status === "accepted")))} <small>ETH</small>`;
+    $("#st-paid").innerHTML = `${fmtEth(sum(reqs.filter((r) => r.status === "paid")))} <small>ETH</small>`;
+  }
+
+  // tabs
+  for (const f of ["all", "open", "mine", "tutoring"]) $("#n-" + f).textContent = reqs.filter((r) => inFilter(r, f)).length;
+  document.querySelectorAll(".tab").forEach((t) => {
+    const f = t.dataset.f;
+    t.hidden = (f === "mine" || f === "tutoring") && !state.account;
+    t.setAttribute("aria-pressed", String(f === state.filter));
+  });
+
+  $("#board-sub").textContent = state.account
+    ? "Everything here is read straight from the contract."
+    : "Anyone can browse. Connect a wallet to post or accept a request.";
+
+  if (!state.loaded) {
+    list.innerHTML = state.loadError
+      ? `<div class="empty"><b>Couldn't reach the network</b><p>The board couldn't be loaded just now. Try the refresh button, or connect your wallet.</p></div>`
+      : Array.from({ length: 3 }, () => `<div class="skel"><i style="width:30%"></i><i style="width:75%;height:16px"></i><i style="width:45%"></i></div>`).join("");
     return;
   }
-  try {
-    provider = new ethers.BrowserProvider(window.ethereum);
-    await provider.send("eth_requestAccounts", []);
- 
-    const net = await provider.getNetwork();
-    if ("0x" + net.chainId.toString(16) !== CHAIN_ID_HEX) {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: CHAIN_ID_HEX }]
-      });
-      provider = new ethers.BrowserProvider(window.ethereum);
+  const rows = reqs.filter((r) => inFilter(r, state.filter));
+  list.innerHTML = rows.length ? rows.map(requestRow).join("") : emptyState();
+}
+
+function renderUpdated() {
+  if (!state.updatedAt) { $("#updated").textContent = ""; return; }
+  const s = Math.round((Date.now() - state.updatedAt) / 1000);
+  $("#updated").textContent = s < 15 ? "Updated just now" : s < 60 ? `Updated ${s}s ago` : `Updated ${Math.round(s / 60)} min ago`;
+}
+
+// ---------- header, banner, form ----------
+function renderWallet() {
+  const box = $("#wallet");
+  const pill = $("#net-pill");
+  pill.classList.remove("ok", "bad");
+
+  if (!window.ethereum) {
+    $("#net-label").textContent = "Sepolia test network";
+    box.innerHTML = `<a class="btn btn-primary btn-sm" href="https://metamask.io/download/" target="_blank" rel="noopener">Get MetaMask</a>`;
+  } else if (!state.account) {
+    $("#net-label").textContent = "Sepolia test network";
+    box.innerHTML = `<button class="btn btn-primary btn-sm" id="connect" type="button">Connect wallet</button>`;
+    $("#connect").onclick = connect;
+  } else {
+    pill.classList.add(state.chainOk ? "ok" : "bad");
+    $("#net-label").textContent = state.chainOk ? CHAIN_NAME : "Wrong network";
+    const shown = ethers.getAddress(state.account);
+    const bal = state.balance != null ? `<span class="bal">${fmtEth(state.balance)} ETH</span>` : "";
+    box.innerHTML = `
+      <button class="wallet-btn" id="wallet-btn" type="button" aria-haspopup="true" aria-expanded="false">
+        ${avatar(shown)}<span class="addr">${short(shown)}</span>${bal}
+      </button>
+      <div class="menu" id="menu" role="menu">
+        <div class="menu-head"><div class="k">Connected account</div><div class="full">${shown}</div></div>
+        <button type="button" role="menuitem" id="copy-addr">Copy address</button>
+        <a role="menuitem" href="${EXPLORER}/address/${state.account}" target="_blank" rel="noopener">View on Etherscan</a>
+        <a role="menuitem" href="${FAUCET}" target="_blank" rel="noopener">Get test ETH</a>
+      </div>`;
+    const btn = $("#wallet-btn"), menu = $("#menu");
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      const open = menu.classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
+    };
+    $("#copy-addr").onclick = async () => {
+      menu.classList.remove("open");
+      try { await navigator.clipboard.writeText(shown); toast({ type: "success", title: "Address copied", timeout: 3000 }); }
+      catch { toast({ type: "info", title: "Couldn't copy", body: esc(state.account), timeout: 8000 }); }
+    };
+  }
+
+  // wrong-network banner
+  const showBanner = !!window.ethereum && !!state.account && !state.chainOk;
+  $("#banner").hidden = !showBanner;
+  if (showBanner) {
+    $("#banner-text").textContent = `Your wallet is on a different network. TutorTrust runs on ${CHAIN_NAME}, the Ethereum test network.`;
+    const b = $("#banner-action");
+    b.hidden = false;
+    b.textContent = `Switch to ${CHAIN_NAME}`;
+    b.onclick = switchNetwork;
+  }
+}
+
+function renderForm() {
+  const btn = $("#post-btn");
+  btn.disabled = state.posting;
+  btn.innerHTML = state.posting ? '<span class="spin"></span> Posting…' : "Post and lock payment";
+  $("#form-note").textContent = state.signer
+    ? "The payment leaves your wallet now and waits in the contract."
+    : window.ethereum
+      ? "You'll be asked to connect your wallet first."
+      : "You'll need the MetaMask browser extension to post.";
+  const low = state.signer && state.balance != null && state.balance < ethers.parseEther("0.002");
+  $("#low-balance").classList.toggle("show", !!low);
+}
+
+function showFormError(msg) {
+  const el = $("#form-error");
+  el.textContent = msg || "";
+  el.classList.toggle("show", !!msg);
+}
+
+function syncChips() {
+  const v = $("#amount").value.trim();
+  document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.v === v));
+}
+
+// ---------- events ----------
+function wireEvents() {
+  $("#contract-link").href = `${EXPLORER}/address/${CONTRACT_ADDRESS}#code`;
+  $("#footer-contract").href = `${EXPLORER}/address/${CONTRACT_ADDRESS}`;
+  $("#footer-contract").textContent = short(CONTRACT_ADDRESS);
+  $("#faucet-link").href = FAUCET;
+
+  $("#subject").addEventListener("input", (e) => {
+    $("#count").textContent = `${e.target.value.length}/120`;
+    showFormError("");
+  });
+  $("#amount").addEventListener("input", () => { syncChips(); showFormError(""); });
+  $("#chips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    $("#amount").value = c.dataset.v;
+    syncChips();
+    showFormError("");
+  });
+
+  $("#post-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (state.posting) return;
+    const subject = $("#subject").value.trim();
+    const raw = $("#amount").value.trim().replace(",", ".");
+    if (!subject) return showFormError("Say what you need help with.");
+    if (!raw) return showFormError("Enter how much you'll pay.");
+    if (!/^(\d+\.?\d*|\.\d+)$/.test(raw)) return showFormError("Enter the amount as a number, like 0.005.");
+    let value;
+    try { value = ethers.parseEther(raw); } catch { return showFormError("That amount has too many decimal places."); }
+    if (value <= 0n) return showFormError("The payment has to be more than zero.");
+    if (state.balance != null && value > state.balance) return showFormError(`That's more than you have (${fmtEth(state.balance)} ETH).`);
+    showFormError("");
+
+    state.posting = true; renderForm();
+    const iface = new ethers.Interface(ABI);
+    const receipt = await runTx({
+      pending: "Posting your request",
+      done: (rc) => {
+        for (const log of rc.logs) {
+          try { const p = iface.parseLog(log); if (p && p.name === "RequestPosted") return `Request #${p.args.id} is live`; } catch {}
+        }
+        return "Your request is live";
+      },
+      send: (c) => c.postRequest(subject, { value })
+    });
+    state.posting = false; renderForm();
+    if (receipt) {
+      $("#post-form").reset();
+      $("#count").textContent = "0/120";
+      syncChips();
     }
- 
-    signer = await provider.getSigner();
-    myAddress = await signer.getAddress();
-    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
- 
-    $("account").textContent = short(myAddress);
-    $("postBtn").disabled = false;
-    $("refreshBtn").disabled = false;
-    say("Connected. You're talking to the contract at " +
-        `<a href="${EXPLORER}/address/${CONTRACT_ADDRESS}" target="_blank" class="mono">${short(CONTRACT_ADDRESS)}</a> on Sepolia.`);
-    await refresh();
-  } catch (err) {
-    say("Could not connect: " + explain(err));
+  });
+
+  $("#tabs").addEventListener("click", (e) => {
+    const t = e.target.closest(".tab");
+    if (!t) return;
+    state.filter = t.dataset.f;
+    renderBoard();
+  });
+
+  let armTimer;
+  $("#list").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-action]");
+    if (!b) return;
+    const id = Number(b.dataset.id);
+    const action = b.dataset.action;
+    const r = state.requests.find((x) => x.id === id);
+    if (!r) return;
+
+    if (action === "disarm") { state.armed = null; renderBoard(); return; }
+
+    if (action === "accept") {
+      runTx({ id, pending: `Accepting request #${id}`, done: `You're the tutor for #${id}`, send: (c) => c.acceptRequest(id) });
+      return;
+    }
+
+    // Releasing and cancelling move money, so they take a second click.
+    const isArmed = state.armed && state.armed.id === id && state.armed.action === action;
+    if (!isArmed) {
+      state.armed = { id, action };
+      clearTimeout(armTimer);
+      armTimer = setTimeout(() => { state.armed = null; renderBoard(); }, 8000);
+      renderBoard();
+      return;
+    }
+    clearTimeout(armTimer);
+    const amt = fmtEth(r.amount);
+    if (action === "release") {
+      runTx({ id, pending: `Paying your tutor for #${id}`, done: `Paid ${amt} ETH to ${short(r.tutor)}`, send: (c) => c.releasePayment(id) });
+    } else if (action === "cancel") {
+      runTx({ id, pending: `Cancelling #${id}`, done: `Cancelled. ${amt} ETH is back in your wallet`, send: (c) => c.cancelRequest(id) });
+    }
+  });
+
+  $("#refresh").addEventListener("click", () => loadBoard());
+
+  document.addEventListener("click", (e) => {
+    const menu = $("#menu");
+    if (menu && !e.target.closest("#wallet")) menu.classList.remove("open");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") $("#menu")?.classList.remove("open");
+  });
+
+  if (window.ethereum?.on) {
+    window.ethereum.on("accountsChanged", () => syncWallet());
+    window.ethereum.on("chainChanged", async () => { await syncWallet(); loadBoard({ quiet: true }); });
   }
+
+  // Keep the board fresh while the tab is open.
+  setInterval(() => { if (document.visibilityState === "visible") loadBoard({ quiet: true }); }, 20000);
+  setInterval(renderUpdated, 10000);
 }
- 
-async function post() {
-  const subject = $("subject").value.trim();
-  const price = $("price").value.trim();
-  if (!subject || !price) { say("Give the request a subject and a payment amount."); return; }
-  try {
-    say("Sending transaction… MetaMask will ask you to confirm.");
-    const tx = await contract.postRequest(subject, { value: ethers.parseEther(price) });
-    say(`Waiting for the network to confirm <a href="${EXPLORER}/tx/${tx.hash}" target="_blank">your transaction</a>…`);
-    await tx.wait();
-    say("Request posted! Your ETH is now held by the contract — not by us, not by a platform.");
-    $("subject").value = ""; $("price").value = "";
-    await refresh();
-  } catch (err) { say("Transaction failed: " + explain(err)); }
-}
- 
-async function act(fn, id, pending, done) {
-  try {
-    say(pending);
-    const tx = await contract[fn](id);
-    say(`Waiting for confirmation of <a href="${EXPLORER}/tx/${tx.hash}" target="_blank">your transaction</a>…`);
-    await tx.wait();
-    say(done);
-    await refresh();
-  } catch (err) { say("Transaction failed: " + explain(err)); }
-}
- 
-async function refresh() {
-  const tbody = $("reqTable").querySelector("tbody");
-  tbody.innerHTML = "";
-  const count = await contract.requestCount();
-  for (let i = 1n; i <= count; i++) {
-    const r = await contract.requests(i);
-    const status = Number(r.status);
-    const mine = r.student.toLowerCase() === myAddress.toLowerCase();
-    const row = document.createElement("tr");
- 
-    let actions = "";
-    if (status === 0 && !mine) actions += `<button onclick="act('acceptRequest', ${i}, 'Accepting…', 'You are the tutor now. After the session, the student releases your payment.')">Accept</button> `;
-    if (status === 0 && mine)  actions += `<button class="secondary" onclick="act('cancelRequest', ${i}, 'Cancelling…', 'Request cancelled — the contract refunded your ETH.')">Cancel</button> `;
-    if (status === 1 && mine)  actions += `<button onclick="act('releasePayment', ${i}, 'Releasing payment…', 'Payment released — the contract just paid your tutor directly.')">Release payment</button>`;
- 
-    row.innerHTML =
-      `<td>${i}</td><td>${r.subject}</td>` +
-      `<td>${ethers.formatEther(r.amount)} ETH</td>` +
-      `<td><span class="pill s${status}">${STATUS_NAMES[status]}</span></td>` +
-      `<td>${actions || "—"}</td>`;
-    tbody.appendChild(row);
+
+// ---------- start ----------
+(async function start() {
+  if (!window.ethers) {
+    $("#banner").hidden = false;
+    $("#banner-text").textContent = "Part of this page didn't load. Check your internet connection and refresh.";
+    return;
   }
-  if (count === 0n) tbody.innerHTML = "<tr><td colspan='5'>No requests yet — post the first one.</td></tr>";
-}
- 
-$("connectBtn").addEventListener("click", connect);
-$("postBtn").addEventListener("click", post);
-$("refreshBtn").addEventListener("click", refresh);
+  wireEvents();
+  renderWallet();
+  renderForm();
+  renderBoard();
+  await syncWallet();        // picks up an existing MetaMask connection without a popup
+  await loadBoard({ quiet: true });
+})();
 </script>
 </body>
 </html>
